@@ -94,6 +94,27 @@ PanelWindow {
   // Current support: null = floor, else a platform object out of `platforms`.
   property var support: null
 
+  // Platforms contributed by other plugins (petService.externalPlatforms),
+  // narrowed to this screen. Geometry is range-checked later in
+  // rebuildPlatforms — the layer surface has no real height yet the first
+  // time this evaluates.
+  readonly property var externalPlatforms: {
+    var svc = petService
+    var src = svc && svc.externalPlatforms ? svc.externalPlatforms : []
+    var name = screen ? screen.name : ""
+    var out = []
+    for (var i = 0; i < src.length; i++) {
+      var p = src[i]
+      if (!p || !isFinite(p.x1) || !isFinite(p.x2) || !isFinite(p.y) || p.x2 <= p.x1) continue
+      if (p.screen && name && p.screen !== name) continue
+      out.push({ x1: Number(p.x1), x2: Number(p.x2), y: Number(p.y),
+                 kind: p.kind || "surface",
+                 address: "ext:" + String(p.id !== undefined ? p.id : i) })
+    }
+    return out
+  }
+  onExternalPlatformsChanged: refreshDebounce.restart()
+
   function rebuildPlatforms() {
     if (!hyprMonitor) { platforms = []; validateSupport(); return }
     var ws = hyprMonitor.activeWorkspace ? hyprMonitor.activeWorkspace.id : -1
@@ -116,6 +137,16 @@ PanelWindow {
       x2 = Math.min(root.width, x2)
       if (x2 - x1 < root.spriteSize * 2) continue
       list.push({ x1: x1, x2: x2, y: y, address: toplevel.address })
+    }
+    for (var t = 0; t < externalPlatforms.length; t++) {
+      var ep = externalPlatforms[t]
+      // Now that the surface has a real height, drop any contributed platform
+      // that would sit off-screen or below the floor, and clamp it to width.
+      if (ep.y < root.headroom || ep.y > root.floorY - 3) continue
+      var ex1 = Math.max(0, ep.x1)
+      var ex2 = Math.min(root.width, ep.x2)
+      if (ex2 - ex1 < root.spriteSize) continue
+      list.push({ x1: ex1, x2: ex2, y: ep.y, address: ep.address })
     }
     platforms = list
     validateSupport()
@@ -160,12 +191,29 @@ PanelWindow {
       : { x1: 0, x2: root.width }
   }
 
-  function landingBelow(x, fromY) {
+  // Whether the (unchanged, vertical) exit beam comes down over a contributed
+  // platform — e.g. a tree's foliage. When it does, the pet drops from up high
+  // so the fall clears the crown and lands up on the platform, not beside it.
+  function dropColumnOverExternal(feetX) {
+    var c = feetX + spriteSize / 2
+    for (var i = 0; i < externalPlatforms.length; i++) {
+      var p = externalPlatforms[i]
+      if (c >= p.x1 && c <= p.x2) return true
+    }
+    return false
+  }
+
+  // `reach` (optional) is how far the pet will travel toward the floor this
+  // tick: a platform up to `reach` above `fromY` still counts, so a fast fall
+  // snaps onto a thin platform instead of stepping straight past it in a tick
+  // that started just too far away to catch it.
+  function landingBelow(x, fromY, reach) {
     var best = { y: floorY, platform: null }
     var center = x + spriteSize / 2
+    var lo = fromY + 1 - (reach || 0)
     for (var i = 0; i < platforms.length; i++) {
       var p = platforms[i]
-      if (p.y > fromY + 1 && p.y < best.y && center >= p.x1 && center <= p.x2)
+      if (p.y > lo && p.y < best.y && center >= p.x1 && center <= p.x2)
         best = { y: p.y, platform: p }
     }
     return best
@@ -333,8 +381,8 @@ PanelWindow {
         if (root.petY - root.beamTopY <= pull) root.finishReturn()
         else root.petY -= pull
       } else if (root.action === "fall") {
-        var landing = root.landingBelow(root.petX, root.petY)
         var drop = root.fallSpeed * dt
+        var landing = root.landingBelow(root.petX, root.petY, drop)
         if (landing.y - root.petY <= drop) {
           root.petY = landing.y
           root.support = landing.platform
@@ -499,9 +547,17 @@ PanelWindow {
     }
     if (svc && svc.handoffX >= 0 && screen && svc.handoffScreen === screen.name) {
       // The pet just dropped out of its panel: continue that fall from right
-      // under the card instead of teleporting to the floor.
+      // under the card instead of teleporting to the floor. The beam itself is
+      // unchanged — vertical, under the card — but when its column comes down
+      // over a contributed platform the pet rides it up onto that (see below).
+      rebuildPlatforms()
       petX = Math.max(0, Math.min(w - spriteSize, svc.handoffX - spriteSize / 2))
-      petY = Math.max(headroom, Math.min(floorY > 0 ? floorY : svc.handoffY, svc.handoffY))
+      // If the beam comes down over a contributed platform, start the fall up
+      // high so it clears the top and lands on the platform; otherwise
+      // continue the shorter fall from just under the card as before.
+      petY = dropColumnOverExternal(petX)
+        ? headroom
+        : Math.max(headroom, Math.min(floorY > 0 ? floorY : svc.handoffY, svc.handoffY))
       beamX = petX + spriteSize / 2
       beamTopY = svc.handoffY
       beamActive = true
