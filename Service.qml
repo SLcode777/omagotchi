@@ -13,6 +13,8 @@ import Quickshell.Io
 // Commands executed (all fixed argv, read-only, no interpolation):
 //   checkupdates              pending official updates
 //   pacman -Qdtq              orphaned packages
+//   head -c N <file>          bounded state-file reads
+//   find <dir> -name '*.json' list external-platform provider files
 Item {
   id: root
 
@@ -720,6 +722,127 @@ Item {
   RoamWindow {
     petService: root
     visible: root.initialized && root.roaming && root.screensSettled
+  }
+
+  // --- external roam platforms --------------------------------------------
+  // Any other plugin can give the roaming pet somewhere extra to stand by
+  // dropping a JSON file in ~/.local/state/omarchy/omagotchi-platforms.d/ —
+  // one file per provider, named after the plugin id, written atomically.
+  // Format:
+  //   { "version": 1,
+  //     "screen": "DP-1",                  // Hyprland output name; "" = any
+  //     "platforms": [
+  //       { "id": "shelf",                 // unique within the file
+  //         "x1": 100, "x2": 340,          // screen px at scale 1, x2 > x1
+  //         "y": 700,                      // top of the surface, screen px
+  //         "kind": "surface" } ] }        // optional: surface | ledge | perch
+  // The pet is never told anything — it just walks onto ground that is there,
+  // climbs to it, and stands. An absent or empty directory changes nothing.
+  readonly property string platformsDir: root.stateDir + "/omagotchi-platforms.d"
+  readonly property int maxProviderBytes: 16384
+  readonly property int maxProviderPlatforms: 24
+  // Flattened [{ id, x1, x2, y, kind, screen }] across every provider file.
+  property var externalPlatforms: []
+  property var _providerPlatforms: ({})   // path -> that file's platforms
+
+  Process {
+    id: platformsLister
+    // Fixed argv, read-only. find does its own globbing — no shell.
+    command: ["find", root.platformsDir, "-maxdepth", "1", "-type", "f",
+              "-name", "*.json"]
+    stdout: SplitParser {
+      onRead: function(line) {
+        var p = String(line).trim()
+        if (p !== "") platformsLister._found.push(p)
+      }
+    }
+    property var _found: []
+    onStarted: _found = []
+    onExited: function() {
+      var live = {}
+      for (var i = 0; i < _found.length; i++) live[_found[i]] = true
+      // Forget providers whose file has gone.
+      var next = {}
+      for (var path in root._providerPlatforms)
+        if (live[path]) next[path] = root._providerPlatforms[path]
+      root._providerPlatforms = next
+      root.providerPaths = _found.slice()
+      root.rebuildExternalPlatforms()
+    }
+  }
+  property var providerPaths: []
+
+  Instantiator {
+    model: root.providerPaths
+    delegate: FileView {
+      required property string modelData
+      path: modelData
+      watchChanges: true
+      printErrors: false
+      onLoaded: root.ingestProvider(modelData, text())
+      onFileChanged: reload()
+      onLoadFailed: root.ingestProvider(modelData, "")
+    }
+  }
+
+  FileView {
+    id: platformsDirWatcher
+    path: root.platformsDir
+    watchChanges: true
+    printErrors: false
+    onFileChanged: platformsRescan.restart()
+  }
+
+  Timer {
+    id: platformsRescan
+    interval: 200
+    onTriggered: platformsLister.running = true
+  }
+  Timer {
+    // Backstop: a provider that writes in place (no rename) won't bump the
+    // directory, and a watcher can miss events under churn.
+    running: true; repeat: true; interval: 15000
+    onTriggered: platformsLister.running = true
+  }
+  Component.onCompleted: platformsLister.running = true
+
+  function ingestProvider(path, raw) {
+    var list = []
+    var text = String(raw || "")
+    if (text.length > 0 && text.length <= root.maxProviderBytes) {
+      try {
+        var doc = JSON.parse(text)
+        if (doc && doc.version === 1 && Array.isArray(doc.platforms)) {
+          var screen = doc.screen ? String(doc.screen) : ""
+          var n = Math.min(doc.platforms.length, root.maxProviderPlatforms)
+          for (var i = 0; i < n; i++) {
+            var p = doc.platforms[i]
+            if (!p || !isFinite(p.x1) || !isFinite(p.x2) || !isFinite(p.y)
+                || Number(p.x2) <= Number(p.x1)) continue
+            list.push({
+              id: String(p.id !== undefined ? p.id : i),
+              x1: Number(p.x1), x2: Number(p.x2), y: Number(p.y),
+              kind: p.kind ? String(p.kind) : "surface",
+              screen: screen,
+            })
+          }
+        }
+      } catch (e) { /* a malformed provider file just contributes nothing */ }
+    }
+    var map = root._providerPlatforms
+    map[path] = list
+    root._providerPlatforms = map
+    root.rebuildExternalPlatforms()
+  }
+
+  function rebuildExternalPlatforms() {
+    var out = []
+    for (var path in root._providerPlatforms) {
+      var list = root._providerPlatforms[path]
+      for (var i = 0; i < list.length && out.length < 96; i++)
+        out.push(list[i])
+    }
+    root.externalPlatforms = out
   }
 
   // --- persistence -----------------------------------------------------------
