@@ -1,2 +1,4 @@
 *.ppm
 *.pbm
+__pycache__/
+*.py[cod]

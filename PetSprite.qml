@@ -19,21 +19,39 @@ Item {
   property bool mirrored: false
 
   property int frame: 0
-  // The animation actually shown once fallbacks are applied.
-  property string resolvedAnim: anim
+  readonly property var animationCatalog: ({
+    "egg": ["idle"],
+    "baby": ["idle", "eat", "sleep"],
+    "child": ["idle", "eat", "sleep", "walk", "climb"],
+    "teen_neat": ["idle", "eat", "sleep", "walk", "climb"],
+    "teen_scruffy": ["idle", "eat", "sleep", "walk", "climb"],
+    "adult_ok": ["idle", "eat", "sleep", "walk", "climb"],
+    "adult_ace": ["idle", "eat", "sleep", "walk", "climb"],
+    "adult_gremlin": ["idle", "eat", "sleep", "walk", "climb"]
+  })
+  // Resolve before assigning Image.source. Loading a known-missing URL first
+  // floods the shell journal every time a transient state changes.
+  property string resolvedAnim: "idle"
+
+  function animationExists(form, anim) {
+    const animations = animationCatalog[form]
+    return animations !== undefined && animations.indexOf(anim) !== -1
+  }
+
+  function resolveAnimation(requested, fallback) {
+    if (animationExists(form, requested)) return requested
+    if (animationExists(form, fallback)) return fallback
+    return "idle"
+  }
 
   function restart() {
-    resolvedAnim = anim
+    resolvedAnim = resolveAnimation(anim, fallbackAnim)
     frame = 0
   }
 
-  function applyFallback() {
-    if (image.status !== Image.Error) return
-    if (resolvedAnim !== fallbackAnim) resolvedAnim = fallbackAnim
-    else if (resolvedAnim !== "idle") resolvedAnim = "idle"
-  }
-
+  Component.onCompleted: restart()
   onAnimChanged: restart()
+  onFallbackAnimChanged: restart()
   onFormChanged: restart()
 
   Image {
@@ -47,10 +65,6 @@ Item {
     fillMode: Image.PreserveAspectFit
     mirror: root.mirrored
     visible: false
-
-    // Deferred: writing resolvedAnim during the source evaluation that
-    // triggered the status change would be a binding loop.
-    onStatusChanged: if (status === Image.Error) Qt.callLater(root.applyFallback)
   }
 
   MultiEffect {
