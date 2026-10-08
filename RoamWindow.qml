@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import qs.Commons
+import qs.Commons as Commons
 
 // The pet's playground: a transparent full-screen overlay where it wanders the
 // bottom edge, climbs up the sides of windows whose top border leaves enough
@@ -562,8 +563,8 @@ PanelWindow {
       fillGradient: LinearGradient {
         x1: root.beamX; y1: root.beamTopY
         x2: root.beamX; y2: root.petY
-        GradientStop { position: 0; color: Qt.alpha(Color.accent, 0.5 * beam.beamPulse) }
-        GradientStop { position: 1; color: Qt.alpha(Color.accent, 0.08 * beam.beamPulse) }
+        GradientStop { position: 0; color: Qt.alpha(Commons.Color.accent, 0.5 * beam.beamPulse) }
+        GradientStop { position: 1; color: Qt.alpha(Commons.Color.accent, 0.08 * beam.beamPulse) }
       }
       startX: root.beamX - root.spriteSize * 0.3
       startY: root.beamTopY
@@ -603,7 +604,7 @@ PanelWindow {
     // A climb without its dedicated sprite reuses the walk frames (rotated).
     fallbackAnim: root.action === "climb" ? "walk" : "idle"
     frameMs: asleep ? 1200 : (root.action === "idle" ? 500 : 220)
-    tint: Color.foreground
+    tint: Commons.Color.foreground
     mirrored: root.facingLeft
 
     // Click = pet; press-and-move = pick it up by the scruff and carry it.
@@ -718,7 +719,7 @@ PanelWindow {
       source: emoteImage
       colorization: 1
       // Same tint as the pet, one creature one color.
-      colorizationColor: Color.foreground
+      colorizationColor: Commons.Color.foreground
     }
   }
 
@@ -767,7 +768,7 @@ PanelWindow {
           anchors.fill: starImage
           source: starImage
           colorization: 1
-          colorizationColor: Color.foreground
+          colorizationColor: Commons.Color.foreground
         }
       }
     }
@@ -776,7 +777,7 @@ PanelWindow {
   Text {
     text: "z z Z"
     visible: root.petService && root.petService.sleeping
-    color: Color.foreground
+    color: Commons.Color.foreground
     font.pixelSize: Math.max(11, root.spriteSize / 3)
     x: root.petX + root.spriteSize
     y: root.petY - root.spriteSize - height / 2
@@ -794,7 +795,7 @@ PanelWindow {
   Text {
     id: heart
     text: "♥"
-    color: Color.accent
+    color: Commons.Color.accent
     font.pixelSize: Math.max(12, root.spriteSize / 3)
     x: root.petX + root.spriteSize / 2 - width / 2
     opacity: 0

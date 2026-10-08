@@ -5,6 +5,7 @@ import QtQuick.Effects
 import QtQuick.Shapes
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 // The pet's home: a card with the pet front and center, its needs as bars,
@@ -37,7 +38,7 @@ Panel {
   readonly property bool ready: !!petService && petService.initialized === true
   // Out roaming = not home: the plate stays empty while it plays outside.
   readonly property bool petIsOut: ready && petService.roaming === true
-  readonly property color foreground: Color.popups.text
+  readonly property color foreground: Commons.Color.popups.text
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
   readonly property var needs: ready ? [
@@ -198,9 +199,9 @@ Panel {
           width: parent.width
           height: Style.space(150)
           radius: Style.cornerRadius > 0 ? Style.space(10) : 0
-          color: Qt.alpha(Color.accent, 0.08)
+          color: Qt.alpha(Commons.Color.accent, 0.08)
           border.width: 1
-          border.color: Qt.alpha(Color.accent, 0.25)
+          border.color: Qt.alpha(Commons.Color.accent, 0.25)
 
           Text {
             anchors.centerIn: parent
@@ -352,8 +353,8 @@ Panel {
                   fillGradient: LinearGradient {
                     x1: lightCone.mx; y1: lightCone.my
                     x2: lightCone.cx; y2: lightCone.cy
-                    GradientStop { position: 0; color: Qt.alpha(Color.accent, 0.45 * decorItem.glow) }
-                    GradientStop { position: 1; color: Qt.alpha(Color.accent, 0) }
+                    GradientStop { position: 0; color: Qt.alpha(Commons.Color.accent, 0.45 * decorItem.glow) }
+                    GradientStop { position: 1; color: Qt.alpha(Commons.Color.accent, 0) }
                   }
                   startX: lightCone.ax; startY: lightCone.ay
                   PathLine { x: lightCone.bx; y: lightCone.by }
@@ -371,7 +372,7 @@ Panel {
                 y: decorItem.height
                 width: decorItem.width * 0.75
                 height: Style.space(2)
-                color: Qt.alpha(Color.accent, 0.55)
+                color: Qt.alpha(Commons.Color.accent, 0.55)
               }
 
               Image {
@@ -385,7 +386,7 @@ Panel {
                 anchors.fill: decorImage
                 source: decorImage
                 colorization: 1
-                colorizationColor: Color.accent
+                colorizationColor: Commons.Color.accent
                 // Furniture stays in the background: dimmer than the pet.
                 opacity: 0.55
               }
@@ -408,7 +409,7 @@ Panel {
               return root.petService.stateAnim
             }
             frameMs: anim === "eat" ? 350 : 600
-            tint: Color.accent
+            tint: Commons.Color.accent
 
             // Being scrubbed is wobbly business.
             SequentialAnimation {
@@ -496,7 +497,7 @@ Panel {
             Text {
               id: sparkleItem
               text: "✦"
-              color: Color.accent
+              color: Commons.Color.accent
               font.pixelSize: Style.space(18)
               opacity: 0
 
@@ -531,7 +532,7 @@ Panel {
             visible: !root.petIsOut && !root.exiting && !root.entering && root.ready
               && root.petService.sleeping
             text: "z z Z"
-            color: Color.accent
+            color: Commons.Color.accent
             font.pixelSize: Style.space(16)
             anchors.left: bigPet.right
             anchors.leftMargin: -Style.space(6)
@@ -585,14 +586,14 @@ Panel {
               source: panelEmoteImage
               colorization: 1
               // Same tint as the pet in the panel.
-              colorizationColor: Color.accent
+              colorizationColor: Commons.Color.accent
             }
           }
 
           Text {
             id: panelHeart
             text: "♥"
-            color: Color.accent
+            color: Commons.Color.accent
             font.pixelSize: Style.space(20)
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
@@ -737,7 +738,7 @@ Panel {
                     height: parent.height
                     radius: parent.radius
                     color: needRow.modelData.value >= 60
-                      ? Color.urgent : Color.accent
+                      ? Commons.Color.urgent : Commons.Color.accent
 
                     Behavior on width { NumberAnimation { duration: 300 } }
                   }
@@ -914,7 +915,7 @@ Panel {
           anim: root.entering ? "idle" : "walk"
           fallbackAnim: "idle"
           frameMs: 220
-          tint: Color.accent
+          tint: Commons.Color.accent
 
           property real slideToY: 0
         }
