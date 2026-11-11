@@ -79,6 +79,10 @@ the in-panel setting applies immediately.
 
 You can also **pick it up**: press and drag to carry it by the scruff, then drop it anywhere. Drop it from too high and it lands
 stunned (it decreases its affection gauge so you'll need to cuddle it to show you're sorry).
+The same goes for hopping off a high window, or one closing under its feet. To spare it, turn on
+**Parachute** in the panel's settings: on any drop high enough to stun, a
+small chute pops open and it floats down to a soft landing instead, with no
+stars and no hit to its affection.
 A plain click is still a petting. "Come home" summons the "gotchi" back to its panel.
 
 ## Letting go

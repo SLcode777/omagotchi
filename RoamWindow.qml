@@ -153,6 +153,7 @@ PanelWindow {
   readonly property real walkSpeed: petScale * 22   // px/s
   readonly property real climbSpeed: petScale * 16
   readonly property real fallSpeed: petScale * 110
+  readonly property real parachuteSpeed: petScale * 40
 
   function currentSurfaceBounds() {
     return support
@@ -178,6 +179,25 @@ PanelWindow {
   // A deliberate jump (dropping out of the panel) lands on its feet, however
   // high it was — only accidents leave the pet seeing stars.
   property bool gentleFall: false
+  // The parachute setting: on a drop that would stun, a chute pops open once
+  // the pet has fallen clear of its canopy's height, and it drifts down to a
+  // soft landing. Reset by each new fall, shown only while falling.
+  readonly property bool parachuteEnabled: !!petService && !!petService.settings
+    && petService.settings.parachute === true
+  property bool parachuteOpen: false
+  // The canopy is 24x19 sprite pixels: 4 wider than the pet on each side,
+  // its lines ending at the pet's shoulders (columns 2 and 13).
+  readonly property int parachuteWidth: 24 * petScale
+  readonly property int parachuteHeight: 19 * petScale
+  // How many sprite rows the canopy sinks into the pet's 16x16 frame so the
+  // lines end on the shoulders: the first row where the body is solid from
+  // column 2 to 13, taking the lower of the two idle frames (the other one
+  // overlaps by a row, which the shared tint hides). Re-measure when an idle
+  // sprite is redrawn; a stale value only leaves a small gap.
+  readonly property var parachuteTuck: ({
+    child: 6, teen_neat: 5, teen_scruffy: 5,
+    adult_ace: 5, adult_ok: 4, adult_gremlin: 5
+  })
 
   // Tractor beam for panel trips: a translucent cone from the card's bottom
   // that carries the pet down (and, someday, back up). Origin is frozen at
@@ -188,7 +208,10 @@ PanelWindow {
 
   function startFall() {
     pendingClimb = null
-    if (action !== "fall") fallStartY = petY
+    if (action !== "fall") {
+      fallStartY = petY
+      parachuteOpen = false
+    }
     action = "fall"
   }
 
@@ -334,11 +357,15 @@ PanelWindow {
         else root.petY -= pull
       } else if (root.action === "fall") {
         var landing = root.landingBelow(root.petX, root.petY)
-        var drop = root.fallSpeed * dt
+        if (root.parachuteEnabled && !root.parachuteOpen && !root.gentleFall
+            && root.petY - root.fallStartY >= root.parachuteHeight
+            && landing.y - root.fallStartY > root.height * root.stunFallFraction)
+          root.parachuteOpen = true
+        var drop = (root.parachuteOpen ? root.parachuteSpeed : root.fallSpeed) * dt
         if (landing.y - root.petY <= drop) {
           root.petY = landing.y
           root.support = landing.platform
-          if (!root.gentleFall
+          if (!root.gentleFall && !root.parachuteOpen
               && root.petY - root.fallStartY > root.height * root.stunFallFraction) {
             root.action = "stunned"
             stunTimer.restart()
@@ -347,6 +374,7 @@ PanelWindow {
             root.action = "idle"
           }
           root.gentleFall = false
+          root.parachuteOpen = false
           root.beamActive = false
         } else {
           root.petY += drop
@@ -590,8 +618,9 @@ PanelWindow {
     anim: {
       if (asleep) return "sleep"
       switch (root.action) {
+      // Under a parachute it floats calmly instead of kicking.
+      case "fall": return root.parachuteOpen ? "idle" : "walk"
       case "walk":
-      case "fall":
       case "held": return "walk" // held: legs kicking in protest
       case "climb": return "climb"
       case "stunned": return "stunned"
@@ -602,7 +631,8 @@ PanelWindow {
     }
     // A climb without its dedicated sprite reuses the walk frames (rotated).
     fallbackAnim: root.action === "climb" ? "walk" : "idle"
-    frameMs: asleep ? 1200 : (root.action === "idle" ? 500 : 220)
+    frameMs: asleep ? 1200
+      : (root.action === "idle" || (root.action === "fall" && root.parachuteOpen) ? 500 : 220)
     tint: Color.foreground
     mirrored: root.facingLeft
 
@@ -676,12 +706,45 @@ PanelWindow {
     }
   }
 
+  // The parachute canopy, hanging the pet from its shoulders as it drifts down.
+  Item {
+    id: parachute
+    visible: root.action === "fall" && root.parachuteOpen
+    width: root.parachuteWidth
+    height: root.parachuteHeight
+    x: root.petX - (width - root.spriteSize) / 2
+    y: {
+      var tuck = root.petService ? root.parachuteTuck[root.petService.form] : undefined
+      return root.petY - root.spriteSize - height
+        + (tuck !== undefined ? tuck : 5) * root.petScale
+    }
+
+    Image {
+      id: parachuteImage
+      anchors.fill: parent
+      source: Qt.resolvedUrl("assets/sprites/decor_parachute.png")
+      smooth: false
+      mipmap: false
+      fillMode: Image.PreserveAspectFit
+      visible: false
+    }
+
+    MultiEffect {
+      anchors.fill: parachuteImage
+      source: parachuteImage
+      colorization: 1
+      colorizationColor: Color.foreground
+    }
+  }
+
   // The shared emote bubble: one 16x16 white glyph per state, floating above
   // the head, tinted urgent when the need turns critical. A missing emote
   // file simply hides the bubble (Image.Error), so they can land one by one.
-  // While stunned, the complaint bubble yields to the orbiting stars.
+  // While stunned, the complaint bubble yields to the orbiting stars, and
+  // under a parachute to the canopy (they share the space above the head).
   readonly property string emoteName: {
-    if (!petService || action === "stunned") return ""
+    if (!petService || action === "stunned"
+        || (action === "fall" && parachuteOpen)) return ""
     return petService.emoteName
   }
 
