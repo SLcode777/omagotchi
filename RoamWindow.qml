@@ -186,6 +186,15 @@ PanelWindow {
     && petService.settings.parachute === true
   property bool parachuteOpen: false
   readonly property int parachuteHeight: 12 * petScale
+  // How many sprite rows the canopy sinks into the pet's 16x16 frame so its
+  // lines end on the head: the first row where columns 5 and 10 are both
+  // drawn, taking the lower of the two idle frames (the other one overlaps
+  // by a row, which the shared tint hides). Re-measure when an idle sprite
+  // is redrawn; a stale value only leaves a small gap.
+  readonly property var parachuteTuck: ({
+    child: 4, teen_neat: 2, teen_scruffy: 4,
+    adult_ace: 1, adult_ok: 3, adult_gremlin: 4
+  })
 
   // Tractor beam for panel trips: a translucent cone from the card's bottom
   // that carries the pet down (and, someday, back up). Origin is frozen at
@@ -701,7 +710,11 @@ PanelWindow {
     width: root.spriteSize
     height: root.parachuteHeight
     x: root.petX
-    y: root.petY - root.spriteSize - height
+    y: {
+      var tuck = root.petService ? root.parachuteTuck[root.petService.form] : undefined
+      return root.petY - root.spriteSize - height
+        + (tuck !== undefined ? tuck : 3) * root.petScale
+    }
 
     Image {
       id: parachuteImage
