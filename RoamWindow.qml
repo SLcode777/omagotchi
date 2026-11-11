@@ -185,15 +185,18 @@ PanelWindow {
   readonly property bool parachuteEnabled: !!petService && !!petService.settings
     && petService.settings.parachute === true
   property bool parachuteOpen: false
-  readonly property int parachuteHeight: 12 * petScale
-  // How many sprite rows the canopy sinks into the pet's 16x16 frame so its
-  // lines end on the head: the first row where columns 5 and 10 are both
-  // drawn, taking the lower of the two idle frames (the other one overlaps
-  // by a row, which the shared tint hides). Re-measure when an idle sprite
-  // is redrawn; a stale value only leaves a small gap.
+  // The canopy is 24x19 sprite pixels: 4 wider than the pet on each side,
+  // its lines ending at the pet's shoulders (columns 2 and 13).
+  readonly property int parachuteWidth: 24 * petScale
+  readonly property int parachuteHeight: 19 * petScale
+  // How many sprite rows the canopy sinks into the pet's 16x16 frame so the
+  // lines end on the shoulders: the first row where the body is solid from
+  // column 2 to 13, taking the lower of the two idle frames (the other one
+  // overlaps by a row, which the shared tint hides). Re-measure when an idle
+  // sprite is redrawn; a stale value only leaves a small gap.
   readonly property var parachuteTuck: ({
-    child: 4, teen_neat: 2, teen_scruffy: 4,
-    adult_ace: 1, adult_ok: 3, adult_gremlin: 4
+    child: 6, teen_neat: 5, teen_scruffy: 5,
+    adult_ace: 5, adult_ok: 4, adult_gremlin: 5
   })
 
   // Tractor beam for panel trips: a translucent cone from the card's bottom
@@ -703,17 +706,17 @@ PanelWindow {
     }
   }
 
-  // The parachute canopy, sitting on the pet's head while it drifts down.
+  // The parachute canopy, hanging the pet from its shoulders as it drifts down.
   Item {
     id: parachute
     visible: root.action === "fall" && root.parachuteOpen
-    width: root.spriteSize
+    width: root.parachuteWidth
     height: root.parachuteHeight
-    x: root.petX
+    x: root.petX - (width - root.spriteSize) / 2
     y: {
       var tuck = root.petService ? root.parachuteTuck[root.petService.form] : undefined
       return root.petY - root.spriteSize - height
-        + (tuck !== undefined ? tuck : 3) * root.petScale
+        + (tuck !== undefined ? tuck : 5) * root.petScale
     }
 
     Image {
