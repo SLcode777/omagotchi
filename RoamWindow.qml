@@ -619,7 +619,8 @@ PanelWindow {
     }
     // A climb without its dedicated sprite reuses the walk frames (rotated).
     fallbackAnim: root.action === "climb" ? "walk" : "idle"
-    frameMs: asleep ? 1200 : (root.action === "idle" ? 500 : 220)
+    frameMs: asleep ? 1200
+      : (root.action === "idle" || (root.action === "fall" && root.parachuteOpen) ? 500 : 220)
     tint: Color.foreground
     mirrored: root.facingLeft
 
@@ -723,9 +724,11 @@ PanelWindow {
   // The shared emote bubble: one 16x16 white glyph per state, floating above
   // the head, tinted urgent when the need turns critical. A missing emote
   // file simply hides the bubble (Image.Error), so they can land one by one.
-  // While stunned, the complaint bubble yields to the orbiting stars.
+  // While stunned, the complaint bubble yields to the orbiting stars, and
+  // under a parachute to the canopy (they share the space above the head).
   readonly property string emoteName: {
-    if (!petService || action === "stunned") return ""
+    if (!petService || action === "stunned"
+        || (action === "fall" && parachuteOpen)) return ""
     return petService.emoteName
   }
 
