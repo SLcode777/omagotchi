@@ -779,7 +779,7 @@ Panel {
 
         // --- settings -------------------------------------------------------
         // Unfolded by the cogwheel in the card's top-right corner: effects
-        // volume, and where the pet goes out to play.
+        // volume, the parachute, and where the pet goes out to play.
         Column {
           id: settingsControl
           width: parent.width
@@ -833,6 +833,31 @@ Panel {
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
               renderType: Text.NativeRendering
+            }
+          }
+
+          Row {
+            spacing: Style.space(8)
+            anchors.horizontalCenter: parent.horizontalCenter
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: "Parachute"
+              color: Qt.alpha(root.foreground, 0.7)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              renderType: Text.NativeRendering
+            }
+
+            Button {
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.ready && root.petService.settings.parachute === true ? "On" : "Off"
+              tooltipText: "A small chute opens on big drops, so the pet floats"
+                + " down instead of landing stunned"
+              fontFamily: root.fontFamily
+              enabled: root.ready
+              onClicked: root.petService.updateSettings({
+                parachute: root.petService.settings.parachute !== true })
             }
           }
 

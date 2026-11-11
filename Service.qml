@@ -32,7 +32,10 @@ Item {
     // `hyprctl monitors` prints, e.g. "DP-1"). Empty keeps the default: the
     // largest screen.
     roamScreen: "",
-    soundVolume: 0.5
+    soundVolume: 0.5,
+    // A small chute that opens on drops big enough to stun, so the pet
+    // floats down instead of landing dizzy and sad.
+    parachute: false
   })
   // Effects volume, 0 (mute) to 1.
   readonly property real soundVolume: {

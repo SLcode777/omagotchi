@@ -153,6 +153,7 @@ PanelWindow {
   readonly property real walkSpeed: petScale * 22   // px/s
   readonly property real climbSpeed: petScale * 16
   readonly property real fallSpeed: petScale * 110
+  readonly property real parachuteSpeed: petScale * 40
 
   function currentSurfaceBounds() {
     return support
@@ -178,6 +179,13 @@ PanelWindow {
   // A deliberate jump (dropping out of the panel) lands on its feet, however
   // high it was — only accidents leave the pet seeing stars.
   property bool gentleFall: false
+  // The parachute setting: on a drop that would stun, a chute pops open once
+  // the pet has fallen clear of its canopy's height, and it drifts down to a
+  // soft landing. Reset by each new fall, shown only while falling.
+  readonly property bool parachuteEnabled: !!petService && !!petService.settings
+    && petService.settings.parachute === true
+  property bool parachuteOpen: false
+  readonly property int parachuteHeight: 12 * petScale
 
   // Tractor beam for panel trips: a translucent cone from the card's bottom
   // that carries the pet down (and, someday, back up). Origin is frozen at
@@ -188,7 +196,10 @@ PanelWindow {
 
   function startFall() {
     pendingClimb = null
-    if (action !== "fall") fallStartY = petY
+    if (action !== "fall") {
+      fallStartY = petY
+      parachuteOpen = false
+    }
     action = "fall"
   }
 
@@ -334,11 +345,15 @@ PanelWindow {
         else root.petY -= pull
       } else if (root.action === "fall") {
         var landing = root.landingBelow(root.petX, root.petY)
-        var drop = root.fallSpeed * dt
+        if (root.parachuteEnabled && !root.parachuteOpen && !root.gentleFall
+            && root.petY - root.fallStartY >= root.parachuteHeight
+            && landing.y - root.fallStartY > root.height * root.stunFallFraction)
+          root.parachuteOpen = true
+        var drop = (root.parachuteOpen ? root.parachuteSpeed : root.fallSpeed) * dt
         if (landing.y - root.petY <= drop) {
           root.petY = landing.y
           root.support = landing.platform
-          if (!root.gentleFall
+          if (!root.gentleFall && !root.parachuteOpen
               && root.petY - root.fallStartY > root.height * root.stunFallFraction) {
             root.action = "stunned"
             stunTimer.restart()
@@ -347,6 +362,7 @@ PanelWindow {
             root.action = "idle"
           }
           root.gentleFall = false
+          root.parachuteOpen = false
           root.beamActive = false
         } else {
           root.petY += drop
@@ -590,8 +606,9 @@ PanelWindow {
     anim: {
       if (asleep) return "sleep"
       switch (root.action) {
+      // Under a parachute it floats calmly instead of kicking.
+      case "fall": return root.parachuteOpen ? "idle" : "walk"
       case "walk":
-      case "fall":
       case "held": return "walk" // held: legs kicking in protest
       case "climb": return "climb"
       case "stunned": return "stunned"
@@ -673,6 +690,33 @@ PanelWindow {
           root.startFall()
         }
       }
+    }
+  }
+
+  // The parachute canopy, sitting on the pet's head while it drifts down.
+  Item {
+    id: parachute
+    visible: root.action === "fall" && root.parachuteOpen
+    width: root.spriteSize
+    height: root.parachuteHeight
+    x: root.petX
+    y: root.petY - root.spriteSize - height
+
+    Image {
+      id: parachuteImage
+      anchors.fill: parent
+      source: Qt.resolvedUrl("assets/sprites/decor_parachute.png")
+      smooth: false
+      mipmap: false
+      fillMode: Image.PreserveAspectFit
+      visible: false
+    }
+
+    MultiEffect {
+      anchors.fill: parachuteImage
+      source: parachuteImage
+      colorization: 1
+      colorizationColor: Color.foreground
     }
   }
 
